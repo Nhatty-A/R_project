@@ -1,0 +1,273 @@
+---
+title: "Bike Route Analysis in San Diego"
+author: "Natnael_AMENU"
+date: "2024-12-10"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    keep_md: false
+---
+<center> 
+<img src="C:\Users\HP\Downloads\BayshoreBikeway 1233x860.jpg" width="400">
+</center>
+\
+```{r setup, include=FALSE, warning=FALSE}
+# Load necessary libraries
+library(tidyverse)
+library(dplyr)
+library(knitr)
+library(gt)
+library(ggplot2)
+library(scales)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+<style>
+  body { font-family: Arial, sans-serif; }
+  h1 { color: darkblue; text-align: center; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+  th { background-color: #f2f2f2; }
+</style>
+
+## **Introduction**
+This analysis explores bike routes in San Diego based on their classifications, lengths, and distribution across council districts. Additional analyses focus on identifying correlations between route length and other variables, as well as providing advanced visualizations. The findings aim to highlight potential gaps and suggest improvements for equitable bike infrastructure.
+
+**Challenge:** The city of San Diego aims to improve its bike route network to promote safer and more equitable cycling opportunities. However, questions remain about the distribution and accessibility of bike routes across council districts, as well as the variability in route length and classification.
+
+## This is a preview of the dataset being used:
+
+| Field      | Description          |
+|------------|----------------------|
+| objectid   | Unique identifier    |
+| rd20full   | Road name            |
+| length_mi  | Length in miles      |
+| class      | Classification name  |
+| xstrt1     | Cross street 1       |
+| xstrt2     | Cross street 2       |
+| district   | Council District     |
+| sapid      | Legacy City asset id |
+| iamfloc    | City asset id        |
+
+\
+```{r data-prep, include=FALSE, warning=FALSE}
+# Load the dataset
+bike_data <- read.csv("bike_routes_datasd.csv")
+
+# Inspect the data structure
+glimpse(bike_data)
+
+# Clean the dataset
+bike_data_clean <- bike_data %>%
+  filter(!is.na(length_mi) & !is.na(class) & !is.na(district))
+
+# Verify cleaned dataset
+summarise(bike_data_clean)
+
+```
+
+### Discriptive Statistics
+
+```{r descriptive-stats, echo=FALSE, error=FALSE, warning=FALSE}
+# Calculate descriptive statistics for route length by class
+stats_by_class <- bike_data_clean %>%
+  group_by(class) %>%
+  summarise(
+    count = n(),
+    total_length = sum(length_mi, na.rm = TRUE),
+    mean_length = mean(length_mi, na.rm = TRUE),
+    median_length = median(length_mi, na.rm = TRUE),
+    max_length = max(length_mi, na.rm = TRUE),
+    min_length = min(length_mi, na.rm = TRUE)
+  ) %>%
+  arrange(desc(total_length))
+
+# Display the results as a table
+kable(stats_by_class, caption = "Descriptive Statistics for Route Length by Class")
+
+```
+
+\
+
+## **Analysis**
+
+### Density of Bike Routes
+
+```{r density-analysis, echo=FALSE, error=FALSE, warning=FALSE}
+bike_density <- bike_data_clean %>%
+  group_by(district) %>%
+  summarise(route_density = sum(length_mi) / n_distinct(class))
+
+kable(bike_density, caption = "Bike Route Density by District")
+```
+
+### Mileage by Classification
+
+```{r mileage-by-class, echo=FALSE, error=FALSE, warning=FALSE}
+# Calculate total mileage by bike route class
+
+mileage_by_class <- bike_data_clean %>%
+  group_by(class) %>%
+  summarise(total_mileage = sum(length_mi, na.rm = TRUE)) %>%
+  arrange(desc(total_mileage))
+
+
+# Display table
+kable(mileage_by_class, caption = "Total Mileage by Bike Route Class")
+```
+
+
+
+```{r viz, echo=FALSE, error=FALSE, warning=FALSE}
+# Visualization
+mileage_by_class %>%
+  ggplot(aes(x = reorder(class, -total_mileage), y = total_mileage, fill = class)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = comma(total_mileage)), vjust = -0.5, size = 4) +
+  labs(title = "Total Mileage by Bike Route Class",
+       x = "Bike Route Class",
+       y = "Total Mileage (miles)") +
+  theme_minimal()
+
+```
+\
+
+**Insights**:
+Class II routes again lead with the highest mileage, emphasizing their widespread implementation.
+Class I and Class IV routes contribute significantly less mileage, with Class IV (Two-Way) at the lowest (7 miles), reflecting limited deployment.
+
+\
+
+### Mileage by District
+
+```{r mileage-by-district, echo=FALSE, error=FALSE, warning=FALSE}
+# Calculate total mileage by district
+mileage_by_district <- bike_data_clean %>%
+  group_by(district) %>%
+  summarise(total_mileage = sum(length_mi, na.rm = TRUE)) %>%
+  arrange(desc(total_mileage))
+
+# Display table
+kable(mileage_by_district, caption = "Total Mileage by District")
+
+# Visualization
+mileage_by_district %>%
+  ggplot(aes(x = factor(district), y = total_mileage, fill = factor(district))) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  labs(title = "Total Mileage by District",
+       x = "Council District",
+       y = "Total Mileage (miles)") +
+  theme_light()
+```
+\
+**Insights**:
+Council District 1 has the highest total mileage, showing the largest investment in bike routes.
+District 4 has the least mileage among all, suggesting a need for enhanced bike route development in this area.
+
+\
+
+### Distribution of Route Classifications
+
+```{r route-class-distribution, echo=FALSE, error=FALSE, warning=FALSE}
+# Visualize the distribution of route classifications
+bike_data_clean %>%
+  ggplot(aes(x = class, fill = class)) +
+  geom_bar(show.legend = FALSE, color = "black") +
+  labs(title = "Distribution of Bike Route Classifications",
+       x = "Bike Route Class",
+       y = "Number of Segments") +
+   theme_classic()
+```
+\
+**Insights**:
+Class II routes dominate with the highest number of segments following by class III, indicating a significant reliance on these routes.
+Other classes (I, IV One-Way, and IV Two-Way) have significantly fewer segments, with Class IV (Two-Way) being the least frequent.
+
+\
+
+### Average Length by Classification
+
+```{r avg-length-by-class, echo=FALSE, error=FALSE, warning=FALSE}
+# Calculate average length by bike route class
+avg_length_by_class <- bike_data_clean %>%
+  group_by(class) %>%
+  summarise(avg_length = mean(length_mi, na.rm = TRUE)) %>%
+  arrange(desc(avg_length))
+
+# Display table
+kable(avg_length_by_class, caption = "Average Length by Bike Route Class")
+
+# Visualization
+avg_length_by_class %>%
+  ggplot(aes(x = reorder(class, -avg_length), y = avg_length, fill = class)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  geom_text(aes(label = round(avg_length, 2)), vjust = -0.5, size = 4) +
+  labs(title = "Average Length by Bike Route Class",
+       x = "Bike Route Class",
+       y = "Average Length (miles)") +
+  theme_minimal()
+```
+\
+**Insights**:
+Class I routes have the highest average length (0.45 miles), suggesting their prominence in longer, continuous pathways. Conversely, 
+Class III routes are shorter on average (0.10 miles), indicating their use in localized or supplementary biking infrastructure.
+
+
+### Correlation Between Length and District
+```{r length-vs-district, echo=FALSE, warning=FALSE, message=FALSE}
+# Create an interactive scatterplot
+library(plotly)
+p <- bike_data_clean %>%
+  ggplot(aes(x = length_mi, y = factor(district), color = class)) +
+  geom_point(size = 3, alpha = 0.7) +
+  labs(title = "Interactive Scatterplot of Route Lengths",
+       x = "Length (miles)",
+       y = "District",
+       color = "Route Class") +
+  theme_minimal()
+ggplotly(p)
+```
+\
+
+**Insights**:
+The scatter plot shows some variability in route lengths across districts. While some districts (like District 1) have longer routes on average, other districts exhibit significant variation in route length, suggesting areas for improvement in infrastructure.
+\
+\
+
+
+## **Conclusion**
+Based on the analysis:
+- Class I and II routes dominate the network but show significant variability in length.
+- Districts with longer average route lengths may indicate better bike accessibility.
+
+Recommendations include:
+- Increasing investment in Class IV facilities for safety.
+- Balancing route distributions across districts to improve equity.
+
+
+\
+
+<div style="display: flex; align-items: center; justify-content: center; margin-top: 20px;">
+  <img src="https://cdn.shopify.com/s/files/1/0822/1627/files/Untitled_design-2_26bab0b7-6588-42a7-89dd-de42db42fc4f_1024x1024.png?v=1567731136" width="300" alt="San Diego Bike Map">
+  <img src="images/san_diego_logo.svg" width="150" alt="San Diego State Department Logo">
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
